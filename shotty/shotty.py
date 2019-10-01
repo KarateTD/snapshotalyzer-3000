@@ -8,6 +8,24 @@ ec2 = session.resource('ec2')
 ###################
 # Helper functions
 ###################
+def filter_instances3(project, enforcer, my_id):
+    instances = []
+    filters = []
+    if project:
+        filters.append({'Name':'tag:Project','Values':[project]})
+
+    if my_id:
+        filters.append({'Name':'instance-id','Values':[my_id]})
+
+    if project or my_id:
+        instances = ec2.instances.filter(Filters=filters)
+    elif enforcer:
+        instances = ec2.instances.all()
+    else:
+        print("You must set a project, instance, or --force")
+
+    return instances
+
 def filter_instances2(project, enforcer):
     instances = []
     if project:
@@ -20,10 +38,17 @@ def filter_instances2(project, enforcer):
 
     return instances
 
-def filter_instances(project):
+def filter_instances(project, my_i):
     instances = []
+    filters = []
+
+    if my_i:
+        filters.append({'Name':'instance-id','Values':[my_i]})
+
     if project:
-        filters=[{'Name':'tag:Project','Values':[project]}]
+        filters.append({'Name':'tag:Project','Values':[project]})
+
+    if project or my_i:
         instances = ec2.instances.filter(Filters=filters)
     else:
         instances = ec2.instances.all()
@@ -55,10 +80,12 @@ def volumes():
 @volumes.command('list')
 @click.option('--project', default=None,
     help="Only volumes for project (tag Project:<name>)")
-def list_volumes(project):
+@click.option('--instance', 'my_id', default=None,
+    help="Only specified instance")
+def list_volumes(project, my_id):
     "List EC2 volumes"
 
-    instances = filter_instances(project)
+    instances = filter_instances(project, my_id)
 
     for i in instances:
         for v in i.volumes.all():
@@ -84,9 +111,11 @@ def snapshots():
     help="Only snapshots for project (tag Project:<name>)")
 @click.option('--all', 'list_all', default=False, is_flag=True,
     help="List all snapshots for each volume, not just the most recent")
-def list_snapshots(project, list_all):
+@click.option('--instance', 'my_id', default=None,
+    help="Only specified instance")
+def list_snapshots(project, list_all, my_id):
     "List Snapshots"
-    instances = filter_instances(project)
+    instances = filter_instances(project, my_id)
 
     for i in instances:
         for v in i.volumes.all():
@@ -116,10 +145,12 @@ def instances():
     help="Only instances for project (tag Project:<name>)")
 @click.option('--force', 'enforcer', default=False, is_flag=True,
     help="Forces reboot if project isn't set")
-def create_snapshots(project, enforcer):
+@click.option('--instance', 'my_id', default=None,
+    help="Only specified instance")
+def create_snapshots(project, enforcer, my_id):
     "Create snapshots for EC2 instances"
 
-    instances = filter_instances2(project, enforcer)
+    instances = filter_instances3(project, enforcer, my_id)
 
     for i in instances:
         print("Stopping {0}...".format(i.id))
@@ -130,7 +161,11 @@ def create_snapshots(project, enforcer):
             if has_pending_snapshot(v):
                 print("  Skipping {0}, snapshot already in progress".format(v.id))
             print("Creating a snapshot of {0}".format(v.id))
-            v.create_snapshot(Description="Created by SnapshotAlyzer 3000")
+            try:
+                v.create_snapshot(Description="Created by SnapshotAlyzer 3000")
+            except botocore.exceptions.ClientError as e:
+                print(" Could not create snapshot for instance {0}, volume {1}: {2}".format(i.id, v.id, str(e)))
+                continue
 
         print("Startng {0}...".format(i.id))
 
@@ -144,9 +179,12 @@ def create_snapshots(project, enforcer):
 @instances.command('list')
 @click.option('--project', default=None,
     help="Only instances for project (tag Project:<name>)")
-def list_instances(project):
+@click.option('--instance', 'my_i', default=None,
+    help="List only the specified instance")
+def list_instances(project, my_i):
     "List EC2 instances"
-    instances = filter_instances(project)
+
+    instances = filter_instances(project, my_i)
 
     for i in instances:
         tags = {t['Key']: t['Value'] for t in i.tags or []}
@@ -166,10 +204,12 @@ def list_instances(project):
     help='Only instances for project')
 @click.option('--force', 'enforcer', default=False, is_flag=True,
     help="Forces reboot if project isn't set")
-def reboot_instances(project, enforcer):
+@click.option('--instance','my_id', default=None,
+    help="Only the specified id")
+def reboot_instances(project, enforcer, my_id):
     "Reboot EC2 instances"
 
-    instances = filter_instances2(project, enforcer)
+    instances = filter_instances3(project, enforcer, my_id)
 
     for i in instances:
         print ("Rebooting {0}".format(i.id))
@@ -184,10 +224,12 @@ def reboot_instances(project, enforcer):
     help='Only instances for project')
 @click.option('--force', 'enforcer', default=False, is_flag=True,
     help="Forces reboot if project isn't set")
-def stop_instances(project, enforcer):
+@click.option('--instance','my_id', default=None,
+    help="Only specified instance")
+def stop_instances(project, enforcer, my_id):
     "Stop EC2 instances"
 
-    instances = filter_instances2(project, enforcer)
+    instances = filter_instances3(project, enforcer, my_id)
 
     for i in instances:
         print ("Stopping {0}".format(i.id))
@@ -202,10 +244,12 @@ def stop_instances(project, enforcer):
     help='Only instances for project')
 @click.option('--force', 'enforcer', default=False, is_flag=True,
     help="Forces reboot if project isn't set")
-def start_instances(project, enforcer):
+@click.option('--instance', 'my_id', default=None,
+    help="Only specified instance")
+def start_instances(project, enforcer, my_id):
     "Start EC2 instances"
 
-    instances = filter_instances2(project, enforcer)
+    instances = filter_instances3(project, enforcer, my_id)
 
     for i in instances:
         print ("Starting {0}".format(i.id))
