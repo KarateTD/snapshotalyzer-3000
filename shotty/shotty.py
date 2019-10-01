@@ -137,13 +137,15 @@ def instances():
     help="Only specified instance")
 def create_snapshots(project, enforcer, my_id):
     "Create snapshots for EC2 instances"
-
+    needRestart = False
     instances = filter_instances3(project, enforcer, my_id)
 
     for i in instances:
         print("Stopping {0}...".format(i.id))
-        i.stop()
-        i.wait_until_stopped()
+        if i.state['Name'] == 'running' or i.state['Name'] == 'pending':
+            i.stop()
+            i.wait_until_stopped()
+            needRestart = True
 
         for v in i.volumes.all():
             if has_pending_snapshot(v):
@@ -153,12 +155,16 @@ def create_snapshots(project, enforcer, my_id):
                 v.create_snapshot(Description="Created by SnapshotAlyzer 3000")
             except botocore.exceptions.ClientError as e:
                 print(" Could not create snapshot for instance {0}, volume {1}: {2}".format(i.id, v.id, str(e)))
+                needRestart = False
                 continue
 
-        print("Startng {0}...".format(i.id))
-
-        i.start()
-        i.wait_until_running()
+        if needRestart:
+            print("Startng {0}...".format(i.id))
+            i.start()
+            i.wait_until_running()
+            needRestart = False
+        else:
+            print("{0} will stay in {1} status.  Snapshot complete".format(i.id, i.state['Name']))
 
     print("Job is done")
 
