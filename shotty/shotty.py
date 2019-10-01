@@ -21,7 +21,7 @@ def filter_instances2(project, enforcer):
     return instances
 
 def filter_instances(project):
-    instance = []
+    instances = []
     if project:
         filters=[{'Name':'tag:Project','Values':[project]}]
         instances = ec2.instances.filter(Filters=filters)
@@ -38,8 +38,12 @@ def has_pending_snapshot(volume):
 # CLI group
 #################
 @click.group()
-def cli():
+#@click.command()
+@click.option('--profile', default='shotty')
+def cli(profile):
     """Shotty manages snapshots"""
+    global ec2
+    ec2 = boto3.Session(profile_name=profile).resource('ec2')
 
 ##################
 # volumes
