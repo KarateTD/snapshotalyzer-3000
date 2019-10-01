@@ -26,18 +26,6 @@ def filter_instances3(project, enforcer, my_id):
 
     return instances
 
-def filter_instances2(project, enforcer):
-    instances = []
-    if project:
-        filters=[{'Name':'tag:Project','Values':[project]}]
-        instances = ec2.instances.filter(Filters=filters)
-    elif enforcer:
-        instances = ec2.instances.all()
-    else:
-        print("You must set a project or --force")
-
-    return instances
-
 def filter_instances(project, my_i):
     instances = []
     filters = []
