@@ -1,6 +1,7 @@
 import boto3
 import botocore
 import click
+import datetime
 
 session = boto3.Session(profile_name='shotty')
 ec2 = session.resource('ec2')
@@ -47,6 +48,14 @@ def has_pending_snapshot(volume):
     snapshots = list(volume.snapshots.all())
     return snapshots and snapshots[0].state == 'pending'
 
+def lastest_successful_snapshot(volume):
+    snapshots = list(volume.snapshots.all())
+    retSnap = None
+    for snap in snapshots:
+        if snap.state == 'completed':
+            retSnap = snap
+            break
+    return retSnap
 #################
 # CLI group
 #################
@@ -135,28 +144,46 @@ def instances():
     help="Forces reboot if project isn't set")
 @click.option('--instance', 'my_id', default=None,
     help="Only specified instance")
-def create_snapshots(project, enforcer, my_id):
+@click.option('--age', default=0,
+    help="Only take the snapshot if the lastest is older than <age> day(s)")
+def create_snapshots(project, enforcer, my_id, age):
     "Create snapshots for EC2 instances"
     needRestart = False
+    shoot = True
+
     instances = filter_instances3(project, enforcer, my_id)
 
     for i in instances:
-        print("Stopping {0}...".format(i.id))
+
         if i.state['Name'] == 'running' or i.state['Name'] == 'pending':
+            print("Stopping {0}...".format(i.id))
             i.stop()
             i.wait_until_stopped()
             needRestart = True
 
         for v in i.volumes.all():
+
+            if age > 0:
+                snapShot = lastest_successful_snapshot(v)
+                new_start_time = snapShot.start_time.replace(tzinfo=None)
+                days = datetime.timedelta(days=age)
+                future = new_start_time + days
+                now = datetime.datetime.now().replace(tzinfo=None)
+                if now <= future:
+                    shoot=False
+
             if has_pending_snapshot(v):
                 print("  Skipping {0}, snapshot already in progress".format(v.id))
-            print("Creating a snapshot of {0}".format(v.id))
-            try:
-                v.create_snapshot(Description="Created by SnapshotAlyzer 3000")
-            except botocore.exceptions.ClientError as e:
-                print(" Could not create snapshot for instance {0}, volume {1}: {2}".format(i.id, v.id, str(e)))
-                needRestart = False
-                continue
+            elif shoot:
+                print("Creating a snapshot of {0}".format(v.id))
+                try:
+                    v.create_snapshot(Description="Created by SnapshotAlyzer 3000")
+                except botocore.exceptions.ClientError as e:
+                    print(" Could not create snapshot for instance {0}, volume {1}: {2}".format(i.id, v.id, str(e)))
+                    needRestart = False
+                    continue
+            else:
+                print("You have created {0} in the last {1} day(s)".format(snapShot.id, age))
 
         if needRestart:
             print("Startng {0}...".format(i.id))
