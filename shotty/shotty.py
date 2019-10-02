@@ -62,10 +62,11 @@ def lastest_successful_snapshot(volume):
 @click.group()
 #@click.command()
 @click.option('--profile', default='shotty')
-def cli(profile):
+@click.option('--region', default='us-east-1')
+def cli(profile, region):
     """Shotty manages snapshots"""
     global ec2
-    ec2 = boto3.Session(profile_name=profile).resource('ec2')
+    ec2 = boto3.Session(profile_name=profile,region_name=region).resource('ec2')
 
 ##################
 # volumes
@@ -176,7 +177,7 @@ def create_snapshots(project, enforcer, my_id, age):
                     i.stop()
                     i.wait_until_stopped()
                     needRestart = True
-                    
+
                 print("Creating a snapshot of {0}".format(v.id))
                 try:
                     v.create_snapshot(Description="Created by SnapshotAlyzer 3000")
