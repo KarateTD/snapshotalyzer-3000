@@ -10,6 +10,8 @@ setuptools = "*"
 [packages]
 boto3 = "*"
 click = "*"
+datetime = "*"
+botocore = "*"
 
 [requires]
 python_version = "3.7"

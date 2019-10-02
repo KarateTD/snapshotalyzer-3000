@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="SnapshotAlyzer-3000",
-    version="1.0",
+    version="2.0",
     author="Tiffany Gray",
     author_email="KarateTD@yahoo.com",
     description="SnapshotAlyzer 3000",
@@ -11,7 +11,9 @@ setup(
     url="https://github.com/KarateTD/snapshotalyzer-3000",
     install_requires=[
         'click',
-        'boto3'
+        'boto3',
+        'datetime',
+        'botocore'
     ],
     entry_points='''
         [console_scripts]
