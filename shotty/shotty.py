@@ -155,11 +155,7 @@ def create_snapshots(project, enforcer, my_id, age):
 
     for i in instances:
 
-        if i.state['Name'] == 'running' or i.state['Name'] == 'pending':
-            print("Stopping {0}...".format(i.id))
-            i.stop()
-            i.wait_until_stopped()
-            needRestart = True
+
 
         for v in i.volumes.all():
 
@@ -175,6 +171,12 @@ def create_snapshots(project, enforcer, my_id, age):
             if has_pending_snapshot(v):
                 print("  Skipping {0}, snapshot already in progress".format(v.id))
             elif shoot:
+                if i.state['Name'] == 'running' or i.state['Name'] == 'pending':
+                    print("Stopping {0}...".format(i.id))
+                    i.stop()
+                    i.wait_until_stopped()
+                    needRestart = True
+                    
                 print("Creating a snapshot of {0}".format(v.id))
                 try:
                     v.create_snapshot(Description="Created by SnapshotAlyzer 3000")
